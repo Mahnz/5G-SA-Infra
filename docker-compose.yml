@@ -11,9 +11,18 @@ services:
     env_file:
       - ${OPEN_5GS_ENV_FILE:-./open5gs/open5gs.env}
     privileged: true
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - "/dev/net/tun:/dev/net/tun"
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.disable_ipv6=0
     ports:
       - "9999:9999/tcp"
     volumes:
+      - /lib/modules:/lib/modules:ro
       - type: bind
         source: ${OPEN5GS_CONFIG_PATH:-./configs/open5gs_SA.yml}
         target: /config/open5gs-5gc.yml.in
@@ -22,7 +31,7 @@ services:
     #  - "38412:38412/sctp"
     #  - "2152:2152/udp"
     # 
-    # command: 5gc -c /config/open5gs-5gc.yml    # Let the entrypoint render env vars and start 5gc
+    command: 5gc -c /config/open5gs-5gc.yml    # Let the entrypoint render env vars and start 5gc
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.20 7777"]
       interval: 3s

@@ -3,6 +3,9 @@
 export UE_GATEWAY_IP="${UE_IP_BASE}.1"
 export UE_IP_RANGE="${UE_IP_BASE}.0/24"
 
+export UE_APN="${UE_APN:=srsapn}"
+export UE_SESSION_MODE="${UE_SESSION_MODE:=3}"
+
 INSTALL_ARCH=x86_64-linux-gnu
 if [ "$(uname -m)" = "aarch64" ]; then
     INSTALL_ARCH="aarch64-linux-gnu"
@@ -60,6 +63,8 @@ do
 done
 
 # setup ogstun and routing
+modprobe ip_tables nf_conntrack nf_nat iptable_nat
+
 python3 setup_tun.py --ip_range ${UE_IP_RANGE}
 if [ $? -ne 0 ]
 then
@@ -69,7 +74,19 @@ fi
 
 # Add subscriber data to open5gs mongo db
 echo "SUBSCRIBER_DB=${SUBSCRIBER_DB}"
-python3 add_users.py --mongodb ${MONGODB_IP} --subscriber_data ${SUBSCRIBER_DB}
+
+if [ -n "${SUBSCRIBER_DB:-}" ]; then
+    echo "Using subscriber data from SUBSCRIBER_DB: ${SUBSCRIBER_DB}  |  APN: ${UE_APN}  |  SESSION_MODE: ${UE_SESSION_MODE}"
+elif [ -f "subscriber_db.csv" ]; then
+    SUBSCRIBER_DB="subscriber_db.csv"
+    echo "Using subscriber data from CSV file: ${SUBSCRIBER_DB}  |  APN: ${UE_APN}  |  SESSION_MODE: ${UE_SESSION_MODE}"
+else
+    echo "No SUBSCRIBER_DB env or subscriber_db.csv found. Failed to add subscribers to database."
+    echo ""
+    exit 1
+fi
+
+python3 add_users.py --mongodb "${MONGODB_IP}" --apn "${UE_APN}" --subscriber_data "${SUBSCRIBER_DB}" --session_mode "${UE_SESSION_MODE}"
 if [ $? -ne 0 ]
 then
     echo "Failed to add subscribers to database"

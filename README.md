@@ -56,15 +56,17 @@ docker compose -f docker-compose.yml -f docker-compose.ui.yml down --remove-orph
 
 ### Open5GS Container
 
-A sample configuration provided by Open5GS can be found in [open5gs-5gc.yml](open5gs/open5gs-5gc.yml), but it NOT a Standalone config. However, it is possible to select the configuration to use by setting `OPEN_5GS_CONFIG_FILE` variable like in the [open5gs.env](open5gs/open5gs.env) file.
+Open5GS provides the sample configuration [open5gs-5gc.yml](open5gs/open5gs-5gc.yml), which is NOT a Standalone config. However, it is possible to select a custom configuration to use by setting the env variable `OPEN_5GS_CONFIG_FILE` in [open5gs.env](open5gs/open5gs.env).
 
-Moreover, the env file itself can be replaced by setting `OPEN_5GS_ENV_FILE` variable like in:
+The config here provided and set as default, i.e., [open5gs_SA.yml](configs/open5gs_SA.yml), is an actual Standalone configuration (disabled: MME, HSS, PCRF, SGWC, SWGU) that can be used as is. Refer to [docs](https://open5gs.org/open5gs/docs/guide/01-quickstart/) for more details.
+
+Moreover, the env file itself can also be replaced by a custom one by setting the `OPEN_5GS_ENV_FILE` variable like in:
 
 ```sh
 OPEN_5GS_ENV_FILE=/my/open5gs.env docker compose -f docker-compose.yml up 5gc
 ```
 
-The following parameters can be set:
+The following parameters are available for customization:
 
 - **`MONGODB_IP`** (default: `127.0.0.1`) - This is the IP of the mongodb to use. 127.0.0.1 is the mongodb that runs inside this container.
 - **`SUBSCRIBER_DB`** - This adds subscriber data for a single or multiple users to the Open5GS mongodb. It contains either:
@@ -73,6 +75,14 @@ The following parameters can be set:
 - **`OPEN5GS_IP`** - This must be set to the IP of the container (here: `10.53.1.2`).
 - **`UE_IP_BASE`** - Defines the IP base used for connected UEs (here: `10.45.0`).
 - **`DEBUG`** (default: `false`) - Set this to `true` to run Open5GS in debug mode.
+
+For better modularity and faster deployment, the following env variables have been implemented:
+
+- **`UE_APN`** (default: `srsapn`) - APN/DNN used for data sessions of the new subscribers created by `add_users.py`.
+- **`UE_SESSION_MODE`** (default: `3`) - Session mode for the data sessions of new subscribers. Possible values:
+  - `1`: IPV4
+  - `2`: IPV6
+  - `3`: IPV4V6
 
 The CSV file must have the following format:
 
@@ -91,7 +101,7 @@ The CSV file must have the following format:
 #               With a valid IPv4 (e.g. '10.45.0.2') the UE will have a statically assigned IP.
 
 # Note: Lines starting by '#' are ignored and will be overwritten:
-ue01,001010123456789,0011...eff,opc,63bf...37d,9001,9,10.45.0.2
+ue01,001010123456789,0011...eff,opc,63bf...37d,8000,9,10.45.0.2
 ```
 
 ---
@@ -105,7 +115,7 @@ The Open5GS WebUI to manually add/change UEs to the mongodb can be accessed at [
 
 Default docker compose uses [gnb_rf_b200_tdd_n78_20mhz.yml](configs/reference/gnb_rf_b200_tdd_n78_20mhz.yml) config file. To choose a different one, set the **`GNB_CONFIG_PATH`** variable in:
 
-- the existing env-file `.env`, or
+- the existing env-file `.env`,
 - in the shell, or
 - in the `docker compose up` command line.
 
@@ -120,12 +130,12 @@ sudo ip ro add 10.45.0.0/16 via 10.53.1.2
 
 ---
 
-Apart from the ones provided by srsRAN ([original configs](configs/original)), two configurations are provided for the gNB:
+Apart from the ones provided by srsRAN ([original configs](configs/original)), two configurations are provided, both using PLMN (*MCC+MNC*) `00101` and TAC `7`, and based on USRP X410 hardware:
 
-- [gnb_tdd.yml](configs/gnb_tdd.yml): TDD configuration, band n78, 20MHz bandwidth, SCS 30kHz.
-- [gnb_fdd.yml](configs/gnb_fdd.yml): FDD configuration, band n3, 20MHz bandwidth, SCS 15kHz.
+- [gnb_tdd.yml](configs/gnb_tdd.yml): TDD mode, band n78, 20MHz bandwidth, SCS 30kHz.
+- [gnb_fdd.yml](configs/gnb_fdd.yml): FDD mode, band n3, 20MHz bandwidth, SCS 15kHz.
 
-Both use PLMN `00101` and TAC `7`, based on USRP X410 hardware.  
+For details, refer to the official configuration [guide](https://docs.srsran.com/projects/project/en/latest/user_manuals/source/config_ref.html) by srsRAN.
 
 ### Metric UI: Enabling metrics reporting in the gNB
 
@@ -152,4 +162,4 @@ The Grafana dashboard can be reached at [localhost:3300](http://localhost:3300),
 After the fist login, it will ask to change the password for a new one, but it can be skipped.
 
 > [!WARNING]
-> **They do NOT support variable substitution**, so if default values in `.env` file are changed, we would need to reach `grafana/dashboards/` and manually search and replace values such as influxdb uid or bucket in every `.json` file.
+> **They do NOT support variable substitution**, so if default values in `.env` file are changed, you would need to reach `grafana/dashboards/` and manually search and replace values such as influxdb uid or bucket in every `.json` file.

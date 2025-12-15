@@ -18,6 +18,7 @@ def add_user(
     apn="srsapn",
     qci="9",
     ip_alloc="",
+    session_mode=3,
 ):
     """Add UE data to Open5GS mongodb"""
 
@@ -31,7 +32,7 @@ def add_user(
             "session": [
                 {
                     "name": apn,
-                    "type": 3,
+                    "type": session_mode,
                     "pcc_rule": [],
                     "ambr": {
                         "uplink": {"value": 1, "unit": 3},
@@ -49,7 +50,7 @@ def add_user(
                 },
                 {
                     "name": "ims",
-                    "type": 3,
+                    "type": session_mode,
                     "pcc_rule": [],
                     "ambr": {
                         "uplink": {"value": 1, "unit": 3},
@@ -176,28 +177,40 @@ def read_from_string(sub_data):
     default="001010123456780,00112233445566778899aabbccddeeff,opc,63bfa50ee6523365ff14c1f45f88737d,8000,9,10.45.1.2",
     help="Single subscriber data string or full path to subscriber data csv-file.",
 )
-def main(mongodb, mongodb_port, subscriber_data):
+@click.option(
+    "--apn",
+    default="srsapn",
+    help="APN/DNN used for data sessions of the new subscribers.",
+)
+@click.option(
+    "--session_mode",
+    default=3,
+    type=int,
+    help="Session mode for the data sessions of the new subscribers. 1: IPV4, 2: IPV6, 3: IPV4V6",
+)
+def main(mongodb, mongodb_port, subscriber_data, apn, session_mode):
 
     open5gs_client = Open5GS(mongodb, mongodb_port)
 
     if subscriber_data.endswith(".csv"):
-        print("Reading subscriber data from csv-file.")
+        print(f"Reading subscriber data from csv-file: {subscriber_data}")
         subscriber_db = read_from_db(subscriber_data)
     else:
-        print("Reading subscriber data from cmd.")
+        print(f"Reading subscriber data from cmd: {subscriber_data}")
         subscriber_db = read_from_string(subscriber_data)
 
     if not subscriber_db:
+        print("Subscriber CSV is empty or could not be read.")
         return sys.exit(1)
 
     for ue in subscriber_db:
         try:
-            sub_data = add_user(**ue)
+            sub_data = add_user(**ue, apn=apn, session_mode=session_mode)
             # Add Subscriber using dict of sub_data
             print(open5gs_client.AddSubscriber(sub_data))
         except pymongo.errors.DuplicateKeyError:
             print(f"UE (IMSI={ue['imsi']}) already exists, updating it.")
-            sub_data = add_user(**ue)
+            sub_data = add_user(**ue, apn=apn, session_mode=session_mode)
             # Update Subscriber using dict of sub_data
             print(open5gs_client.UpdateSubscriber(ue["imsi"], sub_data))
 
