@@ -1,3 +1,5 @@
+# Testing with B210
+
 cu_cp:
   amf:
     addr: 10.53.1.2
@@ -12,12 +14,11 @@ cu_cp:
 
 ru_sdr:
   device_driver: uhd
-  device_args: type=x4xx,addr=192.168.10.2,num_recv_frames=64,num_send_frames=64
-  srate: 30.72                           # RF sample rate might need to be adjusted according to selected bandwidth.
-  clock: internal
-  otw_format: sc16
-  tx_gain: 60                            # Transmit gain of the RF might need to adjusted to the given situation.
-  rx_gain: 40                            # Receive gain of the RF might need to adjusted to the given situation.
+  device_args: type=b200,num_recv_frames=64,num_send_frames=64
+  srate: 23.04
+  otw_format: sc12
+  tx_gain: 80
+  rx_gain: 40
 
 cell_cfg:
   dl_arfcn: 628500                       # ARFCN of the downlink carrier (center frequency).

@@ -1,4 +1,3 @@
-
 cu_cp:
   amf:
     addr: 10.53.1.2
@@ -7,7 +6,7 @@ cu_cp:
     supported_tracking_areas:
       - tac: 7
         plmn_list:
-          - plmn: "00101"
+          - plmn: "99999"
             tai_slice_support_list:
               - sst: 1
 
@@ -25,7 +24,7 @@ cell_cfg:
   band: 3                                # The NR band.
   channel_bandwidth_MHz: 20              # Bandwith in MHz. Number of PRBs will be automatically derived.
   common_scs: 15                         # Subcarrier spacing in kHz used for data.
-  plmn: "00101"                          # PLMN broadcasted by the gNB.
+  plmn: "99999"                          # PLMN broadcasted by the gNB.
   tac: 7                                 # Tracking area code (needs to match the core configuration).
   pci: 1                                 # Physical cell ID.
   pdcch:
@@ -47,8 +46,17 @@ log:
   all_level: debug                       # Logging level applied to all layers. 
 
 pcap:
-  mac_enable: true                       # Set to true to enable MAC-layer PCAPs.
-  mac_filename: /logs/gnb_mac.pcap       # Path where the MAC PCAP is stored.
+  mac_enable: true
+  mac_filename: /logs/gnb_mac.pcap
+
+  rlc_enable: true
+  rlc_filename: /logs/gnb_rlc.pcap
+
+  ngap_enable: true
+  ngap_filename: /logs/gnb_ngap.pcap
+
+  n3_enable: true
+  n3_filename: /logs/gnb_n3.pcap
 
 metrics:
   autostart_stdout_metrics: true

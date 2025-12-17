@@ -13,4 +13,4 @@
 #
 # Note: Lines starting by '#' are ignored and will be overwritten
 # List of UEs with IMSI, and key increasing by one for each new UE. Useful for testing with AmariUE simulator and ue_count option
-ue01,001010000000001,465B5CE8B199B49FAA5F0A2EE238A6BC,opc,E8ED289DEBA952E4283B54E88E6183CA,8000,9,10.45.0.2
+ue01,999990000000001,465B5CE8B199B49FAA5F0A2EE238A6BC,opc,E8ED289DEBA952E4283B54E88E6183CA,8000,9,10.45.0.2
