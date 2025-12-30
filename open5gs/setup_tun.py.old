@@ -38,7 +38,7 @@ def iptables_allow_all(if_name):
 @click.option("--if_name", default="ogstun", help="TUN interface name.")
 @click.option(
     "--ip_range",
-    default="10.45.0.0/24",
+    default="10.45.0.0/16",
     callback=handle_ip_string,
     help="IP range of the TUN interface.",
 )
@@ -74,8 +74,9 @@ def main(if_name, ip_range):
         # setup iptables
         iptables_add_masquerade(if_name, ip_range.with_prefixlen)
         iptables_allow_all(if_name)
+        
         # 'iptables -t nat -A POSTROUTING -s ' + ip_range.with_prefixlen + ' ! -o ' + if_name + ' -j MASQUERADE'
-
+        
         # 'iptables -A INPUT -i ' + if_name + ' -j ACCEPT'
 
 

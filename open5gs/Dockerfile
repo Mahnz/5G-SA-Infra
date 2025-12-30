@@ -9,8 +9,7 @@
 ARG OS_VERSION=22.04
 FROM ubuntu:$OS_VERSION AS base
 
-ARG BUILD_JOBS=3
-ENV BUILD_JOBS=${BUILD_JOBS}
+ARG BUILD_CORES
 
 ENV PYTHONBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
@@ -76,7 +75,7 @@ RUN git ls-remote --tags https://github.com/open5gs/open5gs | sort -t '/' -k 3 -
 RUN git clone --depth 1 --branch $(cat ./open5gsversion) https://github.com/open5gs/open5gs open5gs\
   && cd open5gs \
   && meson build --prefix=`pwd`/install \
-  && ninja -j ${BUILD_JOBS} -C build \
+  && ninja -j ${BUILD_CORES} -C build \
   && cd build \
   && ninja install
 

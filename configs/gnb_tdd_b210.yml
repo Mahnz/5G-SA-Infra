@@ -14,7 +14,7 @@ cu_cp:
 
 ru_sdr:
   device_driver: uhd
-  device_args: type=b200,num_recv_frames=64,num_send_frames=64
+  device_args: type=b200,serial=34AF4C3,num_recv_frames=64,num_send_frames=64
   srate: 23.04
   otw_format: sc12
   tx_gain: 80

@@ -1,7 +1,7 @@
 #! /bin/bash
 
 export UE_GATEWAY_IP="${UE_IP_BASE}.1"
-export UE_IP_RANGE="${UE_IP_BASE}.0/24"
+export UE_IP_RANGE="${UE_IP_BASE}.0/16"
 
 export UE_APN="${UE_APN:=srsapn}"
 export UE_SESSION_MODE="${UE_SESSION_MODE:=3}"

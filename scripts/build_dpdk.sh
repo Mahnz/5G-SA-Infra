@@ -36,7 +36,7 @@ main() {
     cd /tmp
     curl -L "https://fast.dpdk.org/rel/dpdk-${dpdk_version}.tar.xz" | tar xJf -
     cd dpdk*"${dpdk_version}"
-    meson setup build --prefix "/opt/dpdk/${dpdk_version}" -Dcpu_instruction_set="${arch}"
+    meson setup build --prefix "/opt/dpdk/${dpdk_version}" -Dcpu_instruction_set="${arch}" -Ddefault_library=shared
     meson compile -j "${ncores}" -C build
     meson install -C build
 }

@@ -1,15 +1,21 @@
+# This docker-compose configuration is meant to be used to deploy a ZMQ-based infrastructure, running:
+#  - Open5GS: Core Network (unchanged)
+#  - srsRAN: gNB
+#  - srsUE: simulation software-based of a User Equipment
+
 services:
   5gc:
     container_name: open5gs_5gc
     build:
-      context: open5gs
+      context: ../open5gs
+      dockerfile: Dockerfile
       target: open5gs
       args:
         OS_VERSION: "22.04"
         OPEN5GS_VERSION: "v2.7.0"
         BUILD_CORES: ${BUILD_CORES:-4}
     env_file:
-      - ${OPEN_5GS_ENV_FILE:-./open5gs/open5gs.env}
+      - ${OPEN_5GS_ENV_FILE:-../open5gs/open5gs.env}
     privileged: true
     cap_add:
       - NET_ADMIN
@@ -27,7 +33,7 @@ services:
     volumes:
       - /lib/modules:/lib/modules:ro
       - type: bind
-        source: ${OPEN5GS_CONFIG_PATH:-./configs/open5gs_SA.yml}
+        source: ${OPEN5GS_CONFIG_PATH:-../configs/open5gs_SA.yml}
         target: /config/open5gs-5gc.yml.in
         read_only: true
     command: 5gc -c /config/open5gs-5gc.yml
@@ -44,10 +50,14 @@ services:
     container_name: srsran_gnb
     image: srsran/gnb
     build:
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: zmq/gnb/Dockerfile
       args:
         OS_VERSION: "24.04"
         BUILD_CORES: ${BUILD_CORES:-4}
+        EXTRA_CMAKE_ARGS: "-DENABLE_EXPORT=ON -DENABLE_ZEROMQ=ON -DENABLE_MKL=OFF"
+        ENABLE_UHD: ${ENABLE_UHD:-On}
+        ENABLE_DPDK: ${ENABLE_DPDK:-On}
     privileged: true   # for accessing usb devices
     cap_add:
       - NET_ADMIN
@@ -74,12 +84,64 @@ services:
     depends_on:
       5gc:
         condition: service_healthy
-    # command: gnb -c /gnb_config.yml
     command: /bin/sh -lc 'gnb -c /gnb_config.yml || { echo "[gnb] failed with exit code $?"; sleep infinity; }'
+
+  srsue:
+      container_name: srsran_ue
+      image: srsran/srsue
+      build:
+        context: ..
+        dockerfile: zmq/srsue/Dockerfile
+        target: srsue
+        args:
+          BUILD_CORES: ${BUILD_CORES:-4}
+      privileged: true
+      cap_add:
+        - NET_ADMIN
+        - SYS_NICE
+      devices:
+        - /dev/net/tun:/dev/net/tun
+      env_file:
+        - ${SRSUE_ENV_FILE:-./.env}
+      configs:
+        - srsue_config.conf
+      networks:
+        ran:
+          ipv4_address: ${SRSUE_IP:-10.53.1.4}
+      depends_on:
+        - 5gc
+        - gnb
+      command: /bin/sh -lc 'srsue /srsue_config.conf || { echo "[srsue] failed with exit code $?"; sleep infinity; }'
+
+  zmq_broker:
+    container_name: zmq_broker
+    build:
+      context: ./broker
+      dockerfile: Dockerfile
+    networks:
+      ran:
+        ipv4_address: 10.53.1.5
+    volumes:
+      - ./captures:/iq
+    environment:
+      PYTHONUNBUFFERED: "1"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: >
+        /bin/sh -lc
+        'python3 /app/iq_broker.py
+        --dl-front-rep tcp://*:2000
+        --dl-back-req tcp://gnb:2101
+        --ul-front-rep tcp://*:2100
+        --ul-back-req tcp://srsue:2001
+        --ctl-rep tcp://0.0.0.0:5555
+        --out-dir /iq
+        || { echo "[broker] failed with exit code $?"; sleep infinity; }'
 
 configs:
   gnb_config.yml:
-    file: ${GNB_CONFIG_PATH:-../configs/gnb_rf_b200_tdd_n78_20mhz.yml}
+    file: ${GNB_CONFIG_PATH:-../gnb/gnb_fdd_zmq.yml}
+  srsue_config.conf:
+    file: ${SRSUE_CONFIG_PATH:-./srsue/srsue_zmq.conf}
 
 volumes:
   gnb-storage:

@@ -1,0 +1,4 @@
+**/logs
+**/*.pcap
+**/captures
+**/*.fc32

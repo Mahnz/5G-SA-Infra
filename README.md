@@ -163,3 +163,85 @@ After the fist login, it will ask to change the password for a new one, but it c
 
 > [!WARNING]
 > **They do NOT support variable substitution**, so if default values in `.env` file are changed, you would need to reach `grafana/dashboards/` and manually search and replace values such as influxdb uid or bucket in every `.json` file.
+
+## ZMQ-based Radio Interface
+
+This repository includes a "virtual" radio interface based on ZeroMQ (ZMQ) to simulate the connection between gNB and UE(s) without a real RF front-end, whose concept is inspired to this [example](https://docs.srsran.com/projects/project/en/latest/tutorials/source/srsUE/source/index.html) but revised for better flexibility. The architecture is composed of:
+
+- **gNB (srsRAN)**: ZMQ radio endpoint on the network side.
+- **UE (srsUE)**: ZMQ radio endpoint on the terminal side.
+- **ZMQ broker** (`zmq/broker/iq_broker.py`): a relay in the middle that forwards IQ samples (tapping) in both directions and can optionally record them to file.
+- **Control client** (`zmq/broker/iq_ctl.py`): a controller to manage the recording (start/stop/status).
+
+### Architecture scheme
+
+Here it is an essential scheme of the architecture:
+
+```mermaid
+flowchart LR
+  %% Data plane uses a REQ/REP handshake: the receiver (REQ) asks for samples and the transmitter (REP) replies with IQ payloads.
+  %% The broker is in the middle with:
+  %%  - a front REP socket towards the receiver
+  %%  - a back  REQ socket towards the transmitter
+
+  subgraph DL[Downlink DL]
+    ueRX("UE RX (REQ)") -->|"REQ (token)"| bdl("iq_broker.py<br/>DL relay<br/>front: REP, back: REQ")
+    bdl -->|"REQ (token)"| gnbTX("gNB TX (REP)")
+    gnbTX -->|"IQ payload"| bdl
+    bdl -->|"IQ payload"| ueRX
+  end
+
+  subgraph UL[Uplink UL]
+    gnbRX("gNB RX (REQ)") -->|"REQ (token)"| bul("iq_broker.py<br/>UL relay<br/>front: REP, back: REQ")
+    bul -->|"REQ (token)"| ueTX("UE TX (REP)")
+    ueTX -->|"IQ payload"| bul
+    bul -->|"IQ payload"| gnbRX
+  end
+
+  ctl("iq_ctl.py<br/>control client (REQ)") <-->|"START / STOP / STATUS"| ctlEP("iq_broker.py<br/>control endpoint (REP)")
+
+  bdl -. optional write fc32 .-> recDL("Recorder output: TAG_dl.fc32")
+  bul -. optional write fc32 .-> recUL("Recorder output: TAG_ul.fc32")
+```
+
+### Recording (tapping) IQ Samples
+
+For a more dynamic recording of IQ samples, we implemented [iq_ctl.py](zmq/broker/iq_ctl.py), a control script which allows to start/stop recording on-demand via a ZMQ control endpoint exposed by the broker.
+
+To use the recorder we can simply run:
+
+```sh
+# From within the broker container:
+python3 ./zmq/broker/iq_ctl.py --ctl tcp://zmq_broker:5555 <ACTION>
+
+# Or, from the host:
+docker exec -it zmq_broker python3 /app/iq_ctl.py --ctl tcp://127.0.0.1:5555 <ACTION>
+```
+
+where `<ACTION>` can be:
+
+- `START`: starts recording IQ samples. By default, it will identify the recording with an instantaneous timestamp tag, but a custom one can be provided with `--tag <TAG>`.
+- `STOP`: stops the ongoing recording.
+- `STATUS`: queries the current status of the broker (recording or idle).
+
+Once stopped, `iq_broker.py` will write the recordings in `--out-dir` (default: **`/iq`** in the broker container), which is mapped to a host folder (e.g., `captures/`) for offline analysis.
+
+> [!WARNING]
+> Be aware that files grow very quickly in size (1 minute = ~10GB per direction).
+
+### Stack ZMQ (compose/config)
+
+The full setup ready-to-use (Open5GS + gNB + broker/recorder + UE + monitoring) can be found in the [`zmq/`](zmq/) folder, which contains:
+
+- `docker-compose.yml`: to launch Core Network + gNB + UE(s) + ZMQ broker.
+- `docker-compose.ui.yml`: monitoring stack (same as the main one).
+- `gnb/gnb_fdd_zmq.yml`: gNB configuration file using ZMQ interface (FDD mode).
+- `srsue/srsue_zmq.conf`: srsUE configuration file using ZMQ interface.
+- `broker/iq_broker.py`: relay + recorder.
+- `broker/iq_ctl.py`: control client.
+
+> [!WARNING]
+> This architecture is that only a single UE can be connected at a time, due to the REQ/REP handshake mechanism used for data plane.
+
+> [!WARNING]
+> Moreover, the nature of ZMQ implies that when either gNB or UE is stopped/restarted, the other one must be restarted as well.

@@ -1,4 +1,4 @@
-# Testing with B210
+# Testing with ZMQ
 
 cu_cp:
   amf:
@@ -11,14 +11,15 @@ cu_cp:
           - plmn: "99999"
             tai_slice_support_list:
               - sst: 1
+  inactivity_timer: 7200
 
 ru_sdr:
-  device_driver: uhd
-  device_args: type=b200,serial=34AF4C3,num_recv_frames=64,num_send_frames=64
+  device_driver: zmq
+  # device_args: tx_port=tcp://*:2000,rx_port=tcp://srsue:2001,base_srate=23.04e6
+  device_args: tx_port=tcp://*:2101,rx_port=tcp://zmq_broker:2100,base_srate=23.04e6   # with broker
   srate: 23.04
-  otw_format: sc12
-  tx_gain: 80
-  rx_gain: 40
+  tx_gain: 75
+  rx_gain: 75
 
 cell_cfg:
   dl_arfcn: 373000                       # ARFCN of the downlink carrier (center frequency).
@@ -38,25 +39,30 @@ cell_cfg:
 
       ss2_type: ue_dedicated
       ss2_n_candidates: [0, 0, 4, 0, 0]
-      dci_format_0_1_and_1_1: true
+      dci_format_0_1_and_1_1: false
   prach:
     prach_config_index: 1
+  pdsch:
+    mcs_table: qam64
+  pusch:
+    mcs_table: qam64
 
 log:
+  # filename: stdout
   filename: /logs/gnb.log                # Path of the log file.
-  all_level: debug                       # Logging level applied to all layers. 
+  all_level: info                       # Logging level applied to all layers. 
 
 pcap:
   mac_enable: true
   mac_filename: /logs/gnb_mac.pcap
 
-  rlc_enable: true
+  rlc_enable: false
   rlc_filename: /logs/gnb_rlc.pcap
 
-  ngap_enable: true
+  ngap_enable: false
   ngap_filename: /logs/gnb_ngap.pcap
 
-  n3_enable: true
+  n3_enable: false
   n3_filename: /logs/gnb_n3.pcap
 
 metrics:

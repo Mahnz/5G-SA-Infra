@@ -40,11 +40,12 @@ main() {
     if [[ "$ID" == "debian" || "$ID" == "ubuntu" ]]; then
         if [[ "$mode" == "all" || "$mode" == "build" ]]; then
             DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-install-recommends \
-                cmake make gcc g++ pkg-config libfftw3-dev libmbedtls-dev libsctp-dev libyaml-cpp-dev libgtest-dev
+                cmake make gcc g++ pkg-config libfftw3-dev libmbedtls-dev libsctp-dev libyaml-cpp-dev libgtest-dev \
+                libzmq3-dev libczmq-dev pkg-config
         fi
         if [[ "$mode" == "all" || "$mode" == "run" ]]; then
             DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-install-recommends \
-                libfftw3-dev libmbedtls-dev libsctp-dev libyaml-cpp-dev libgtest-dev
+                libfftw3-dev libmbedtls-dev libsctp-dev libyaml-cpp-dev libgtest-dev libzmq3-dev libzmq5 libczmq4
         fi
         if [[ "$mode" == "all" || "$mode" == "extra" ]]; then
             DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-install-recommends \

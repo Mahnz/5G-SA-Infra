@@ -62,7 +62,7 @@ def enable_ip_forward():
 @click.option("--if_name", default="ogstun", help="TUN interface name.")
 @click.option(
     "--ip_range",
-    default="10.45.0.0/24",
+    default="10.45.0.0/16",
     callback=handle_ip_string,
     help="UE IPv4 pool routed via the TUN (should match UPF/SMF config).",
 )
@@ -78,7 +78,7 @@ def main(if_name, ip_range):
             "Cannot determine default egress interface inside container."
         )
 
-    # Use the first usable address for ogstun, as in Open5GS docs (e.g., 10.45.0.1/24)
+    # Use the first usable address for ogstun, as in Open5GS docs (e.g., 10.45.0.1/16)
     ogstun_ip = str(next(ip_range.hosts()))
     prefix = ip_range.prefixlen
 

@@ -1,23 +1,3 @@
-#
-# Copyright 2021-2025 Software Radio Systems Limited
-#
-# This file is part of srsRAN
-#
-# srsRAN is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of
-# the License, or (at your option) any later version.
-#
-# srsRAN is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU Affero General Public License for more details.
-#
-# A copy of the GNU Affero General Public License can be found in
-# the LICENSE file in the top-level directory of this distribution
-# and at http://www.gnu.org/licenses/.
-#
-
 # Build args
 ################
 # OS_VERSION            Ubuntu OS version
@@ -38,13 +18,13 @@ ARG MARCH=native
 
 FROM ubuntu:$OS_VERSION AS builder
 
-ARG BUILD_JOBS=3
-ENV BUILD_JOBS=${BUILD_JOBS}
+ARG BUILD_CORES
 
 # Adding the complete repo to the context, in /src folder
 # ADD . /src
 # Or download the full repo
-RUN apt update && apt-get install -y --no-install-recommends git git-lfs ca-certificates
+RUN apt update && apt-get install -y --no-install-recommends git git-lfs ca-certificates \
+    pkg-config libzmq3-dev libczmq-dev
 RUN git clone https://github.com/srsran/srsRAN_Project.git /src
 
 # Install srsRAN build dependencies
@@ -58,15 +38,15 @@ ARG DPDK_VERSION
 ARG MARCH
 
 # Compile UHD/DPDK
-RUN /src/docker/scripts/build_uhd.sh "${UHD_VERSION}" ${MARCH} ${BUILD_JOBS} && \
-    /src/docker/scripts/build_dpdk.sh "${DPDK_VERSION}" ${MARCH} ${BUILD_JOBS}
+RUN /src/docker/scripts/build_uhd.sh "${UHD_VERSION}" ${MARCH} ${BUILD_CORES} && \
+    /src/docker/scripts/build_dpdk.sh "${DPDK_VERSION}" ${MARCH} ${BUILD_CORES}
 
 # Compile srsRAN Project and install it in the OS
 ARG COMPILER=gcc
 ARG EXTRA_CMAKE_ARGS=""
 ENV UHD_DIR=/opt/uhd/${UHD_VERSION}
 ENV DPDK_DIR=/opt/dpdk/${DPDK_VERSION}
-RUN /src/docker/scripts/builder.sh -c ${COMPILER} -m "-j${BUILD_JOBS} srscu srsdu srsdu_split_8 srsdu_split_7_2 gnb gnb_split_8 gnb_split_7_2 ru_emulator" \
+RUN /src/docker/scripts/builder.sh -c ${COMPILER} -m "-j${BUILD_CORES} srscu srsdu srsdu_split_8 srsdu_split_7_2 gnb gnb_split_8 gnb_split_7_2 ru_emulator" \
     -DBUILD_TESTING=False -DENABLE_UHD=On -DENABLE_DPDK=On -DMARCH=${MARCH} -DCMAKE_INSTALL_PREFIX=/opt/srs \
     ${EXTRA_CMAKE_ARGS} /src
 RUN cp /src/build/apps/cu/srscu             /tmp/srscu                     && \
@@ -104,8 +84,11 @@ COPY --from=builder /opt/srs                  /usr/local
 ADD scripts/install_uhd_dependencies.sh  /usr/local/etc/install_uhd_dependencies.sh
 ADD scripts/install_dpdk_dependencies.sh /usr/local/etc/install_dpdk_dependencies.sh
 ADD scripts/install_dependencies.sh      /usr/local/etc/install_srsran_dependencies.sh
+
+ENV LD_LIBRARY_PATH=""
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/uhd/${UHD_VERSION}/lib/:/opt/uhd/${UHD_VERSION}/lib/x86_64-linux-gnu/:/opt/uhd/${UHD_VERSION}/lib/aarch64-linux-gnu/
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/dpdk/${DPDK_VERSION}/lib/:/opt/dpdk/${DPDK_VERSION}/lib/x86_64-linux-gnu/:/opt/dpdk/${DPDK_VERSION}/lib/aarch64-linux-gnu/
+
 ENV PATH=$PATH:/opt/uhd/${UHD_VERSION}/bin/:/opt/dpdk/${DPDK_VERSION}/bin/
 
 # Install srsran and lib runtime dependencies
@@ -114,41 +97,6 @@ RUN /usr/local/etc/install_srsran_dependencies.sh run && \
     /usr/local/etc/install_dpdk_dependencies.sh run && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl ntpdate iputils-ping net-tools && \
     apt-get autoremove && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Crea directory logs
 RUN mkdir -p /logs && chmod 777 /logs
-
-#########################################################
-# Stage 3: Generate container SPDX and merge build SPDX #
-#########################################################
-
-FROM anchore/syft:v1.26.1 AS syft-bin
-FROM python:3.11.3-alpine AS spdx-merger
-COPY --from=syft-bin  /syft                      /syft
-COPY --from=runtime   /                          /rootfs
-COPY --from=builder   /opt/srs/share/srsran.spdx /sbom/srsran.spdx
-
-# Generate SPDX file for the container image
-RUN mkdir -p /sbom /usr/local/etc/ && /syft dir:/rootfs -o spdx > /sbom/container.spdx
-# Merge the container SPDX with the build SPDX
-RUN pip install spdxmerge==0.2.0 && \
-    sed -i -e '/def validate(self/,/return messages/ { /messages.append("ExtractedLicense text can not be None"/ { s#messages.append.*#return messages# } }' /usr/local/lib/python3.11/site-packages/spdx/license.py && \
-    sed -i -e 's|def write_text_value(tag, value, out):|def write_text_value(tag, value, out):\n    if value is None:\n        return|'  /usr/local/lib/python3.11/site-packages/spdx/writers/tagvalue.py && \
-    spdxmerge \
-      --docpath /sbom \
-      --outpath /usr/local/etc/ \
-      --name "srsran-image" \
-      --mergetype 1 \
-      --author "Software Radio Systems Ltd" \
-      --email "srs@srs.io" \
-      --docnamespace "https://srs.io/spdxdocs/srsran" \
-      --filetype T >/dev/null && \
-    sed -i 's/^\(FilesAnalyzed:[[:space:]]*\)True/\1true/; s/^\(FilesAnalyzed:[[:space:]]*\)False/\1false/' /usr/local/etc/merged-SBoM-deep.spdx && \
-    sed -i -E 's|^(LicenseID:.*)|\1\nExtractedText: NOASSERTION|' /usr/local/etc/merged-SBoM-deep.spdx && \
-    sed -i '/^Relationship:.*#/d' /usr/local/etc/merged-SBoM-deep.spdx
-
-######################################################
-# Final Stage: Resume run stage with final SPDX file #
-######################################################
-
-FROM runtime
-COPY --from=spdx-merger /usr/local/etc/merged-SBoM-deep.spdx /usr/local/etc/srsran_image.spdx

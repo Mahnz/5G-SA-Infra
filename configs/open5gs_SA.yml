@@ -64,7 +64,7 @@ smf:
   session:
     - subnet: ${UE_IP_RANGE}
       gateway: ${UE_GATEWAY_IP}
-    - dnn: ${UE_APN}
+      # dnn: ${UE_APN}
   dns:
     - 8.8.8.8
     - 8.8.4.4
@@ -138,7 +138,6 @@ upf:
   pfcp:
     server:
       - address: 127.0.0.7
-        dnn: ${UE_APN}
   metrics:
     server:
       - address: 127.0.0.7
@@ -150,6 +149,7 @@ upf:
   session:
     - subnet: ${UE_IP_RANGE}
       gateway: ${UE_GATEWAY_IP}
+      # dnn: ${UE_APN}
 
 nrf:
   sbi:
